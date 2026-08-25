@@ -70,6 +70,7 @@ describe('parseArgs', () => {
     const args = parseArgs([]);
     expect(args.port).toBeUndefined();
     expect(args.host).toBe('127.0.0.1');
+    expect(args.providerId).toBe('claude');
   });
 
   // 2. Valid --port is accepted
@@ -118,6 +119,19 @@ describe('parseArgs', () => {
   // 10. --host is parsed independently of --port
   it('parses --host', () => {
     expect(parseArgs(['--host', '0.0.0.0']).host).toBe('0.0.0.0');
+  });
+
+  it('accepts the Hermes provider', () => {
+    expect(parseArgs(['--provider', 'hermes']).providerId).toBe('hermes');
+  });
+
+  it('rejects an unknown provider', () => {
+    expect(() => parseArgs(['--provider', 'unknown'])).toThrow(CliArgsError);
+    expect(() => parseArgs(['--provider', 'unknown'])).toThrow(/claude, hermes/);
+  });
+
+  it('rejects --provider without a value', () => {
+    expect(() => parseArgs(['--provider'])).toThrow(/Missing value/);
   });
 });
 

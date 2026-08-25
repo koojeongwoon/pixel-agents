@@ -12,7 +12,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import type { HookProvider } from '../../core/src/provider.js';
+import type { HookProvider } from '../../core/src';
 import type { AgentStateStore } from './agentStateStore.js';
 import { DEFAULT_MAX_CONTEXT_TOKENS } from './constants.js';
 import { DismissalTracker } from './dismissalTracker.js';
@@ -211,7 +211,10 @@ export class AgentRuntime {
           this.waitingTimers,
           this.permissionTimers,
           () => this.store.persist(),
-          (agent) => this.registerAgent(agent.sessionId, agent.id),
+          (agent) => {
+            agent.providerId = provider.id;
+            this.registerAgent(agent.sessionId, agent.id);
+          },
         );
       },
       onSessionClear: (agentId, newSessionId, newTranscriptPath) => {

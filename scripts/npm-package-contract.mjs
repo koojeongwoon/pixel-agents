@@ -20,6 +20,8 @@ export const REQUIRED_PACKAGE_FILES = [
   'dist/cli.js',
   'dist/extension.js',
   'dist/hooks/claude-hook.js',
+  'dist/hermes-plugin/plugin.yaml',
+  'dist/hermes-plugin/__init__.py',
   'dist/webview/index.html',
   'icon.png',
   'package.json',

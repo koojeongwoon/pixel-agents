@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
+import type { HookProvider } from '../../core/src';
 import type { AgentRuntime } from './agentRuntime.js';
 import type { AgentStateStore } from './agentStateStore.js';
 import type {
@@ -62,9 +63,11 @@ export class PixelAgentsServer {
   async start(options?: {
     store?: AgentStateStore;
     runtime?: AgentRuntime;
+    activeProvider?: HookProvider;
     embedded?: boolean;
     host?: string;
     port?: number;
+    hookToken?: string;
     staticDir?: string;
     assetCache?: AssetCache;
     onSetHooksEnabled?: SetHooksEnabledSideEffect;
@@ -99,8 +102,10 @@ export class PixelAgentsServer {
       host: options?.host,
       port: options?.port,
       token,
+      hookToken: options?.hookToken,
       store: store!,
       runtime: options?.runtime,
+      activeProvider: options?.activeProvider,
       staticDir: options?.staticDir,
       assetCache: options?.assetCache,
       onHookEvent: (providerId, event) => this.callback?.(providerId, event),

@@ -1,0 +1,14 @@
+name: pixel-agents-status
+version: 0.1.0
+description: Reports minimal Hermes Agent lifecycle metadata to a colocated Pixel Agents server.
+author: Pixel Agents contributors
+kind: standalone
+provides_hooks:
+  - on_session_start
+  - post_llm_call
+  - pre_tool_call
+  - post_tool_call
+  - pre_approval_request
+  - on_session_end
+  - on_session_finalize
+  - on_session_reset

@@ -1,0 +1,17 @@
+.git
+.github
+.husky
+.vscode
+node_modules
+server/node_modules
+webview-ui/node_modules
+dist
+webview-ui/dist
+coverage
+allure-results
+allure-report
+playwright-report
+test-results
+*.tgz
+*.log
+.DS_Store

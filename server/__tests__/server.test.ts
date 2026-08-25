@@ -104,6 +104,16 @@ describe('PixelAgentsServer', () => {
     expect(res.status).toBe(200);
   });
 
+  it('can authenticate hooks with a token separate from the browser token', async () => {
+    const config = await server.start({ hookToken: 'dedicated-hook-token' });
+
+    const hookResponse = await postHook(config.port, 'dedicated-hook-token', '{}');
+    expect(hookResponse.status).toBe(200);
+
+    const browserTokenResponse = await postHook(config.port, config.token, '{}');
+    expect(browserTokenResponse.status).toBe(401);
+  });
+
   // 5. Hook callback fires on valid event
   it('hook callback fires on valid event', async () => {
     const config = await server.start();

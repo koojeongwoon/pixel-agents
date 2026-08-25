@@ -27,7 +27,12 @@ import {
 } from './configPersistence.js';
 import { MAX_PORT, MIN_PORT } from './constants.js';
 import { FileStateAdapter } from './fileStateAdapter.js';
-import { claudeProvider, copyHookScript, hookProviderById } from './providers/index.js';
+import {
+  claudeProvider,
+  copyHookScript,
+  standaloneProviderById,
+  standaloneProviders,
+} from './providers';
 import { PixelAgentsServer } from './server.js';
 
 // ── Argument parsing ──────────────────────────────────────────
@@ -37,6 +42,7 @@ export interface CliArgs {
    *  can run at once without a collision. --port picks a fixed one. */
   port?: number;
   host: string;
+  providerId: string;
 }
 
 /** Thrown by parseArgs on an invalid --port. Kept separate from process.exit so
@@ -45,7 +51,7 @@ export interface CliArgs {
 export class CliArgsError extends Error {}
 
 export function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { host: '127.0.0.1' };
+  const args: CliArgs = { host: '127.0.0.1', providerId: claudeProvider.id };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port' || argv[i] === '-p') {
       const raw = argv[i + 1];
@@ -65,12 +71,25 @@ export function parseArgs(argv: string[]): CliArgs {
     } else if (argv[i] === '--host' && argv[i + 1]) {
       args.host = argv[i + 1];
       i++;
+    } else if (argv[i] === '--provider') {
+      const providerId = argv[i + 1];
+      if (!providerId) {
+        throw new CliArgsError('Missing value for --provider.');
+      }
+      if (!standaloneProviderById(providerId)) {
+        throw new CliArgsError(
+          `Invalid --provider "${providerId}": expected one of ${standaloneProviders.map((provider) => provider.id).join(', ')}.`,
+        );
+      }
+      args.providerId = providerId;
+      i++;
     } else if (argv[i] === '--help') {
       console.log(`Usage: pixel-agents [options]
 
 Options:
   --port, -p <number>   Port to listen on (default: OS-assigned ephemeral port)
   --host <string>       Host to bind to (default: 127.0.0.1)
+  --provider <id>       Runtime provider: claude or hermes (default: claude)
   --help                Show this help message`);
       process.exit(0);
     }
@@ -116,6 +135,10 @@ async function main(): Promise<void> {
   const distRoot = __dirname;
   const packageRoot = path.dirname(distRoot);
   const staticDir = path.join(distRoot, 'webview');
+  const activeProvider = standaloneProviderById(args.providerId);
+  if (!activeProvider) {
+    throw new Error(`Provider disappeared after argument validation: ${args.providerId}`);
+  }
 
   // ── Load assets on startup (same pipeline as VS Code extension) ──
   // External asset directories are merged at startup too, so directories added
@@ -143,7 +166,7 @@ async function main(): Promise<void> {
 
   try {
     // Create runtime first (before server.start, so we can pass it in)
-    const runtime = new AgentRuntime(store, claudeProvider);
+    const runtime = new AgentRuntime(store, activeProvider);
 
     // Wire hook events: HTTP POST -> runtime -> hookEventHandler -> agents
     server.onHookEvent((providerId, event) => {
@@ -156,8 +179,9 @@ async function main(): Promise<void> {
     let currentConfig: { port: number; token: string } | null = null;
     const onSetHooksEnabled = async (providerId: string, enabled: boolean): Promise<void> => {
       if (!currentConfig) return;
-      const provider = hookProviderById(providerId);
+      const provider = standaloneProviderById(providerId);
       if (!provider) return; // unknown id: nothing to install into
+      if (provider.id !== activeProvider.id) return;
       if (enabled) {
         // An explicit toggle in the UI IS the consent to modify the
         // provider's settings file. The bundled claude-hook.js script belongs
@@ -230,9 +254,11 @@ async function main(): Promise<void> {
     const config = await server.start({
       store,
       runtime,
+      activeProvider,
       embedded: false,
       host: args.host,
       port: args.port,
+      hookToken: process.env['PIXEL_AGENTS_HOOK_TOKEN'],
       staticDir,
       assetCache,
       onSetHooksEnabled,
@@ -243,12 +269,17 @@ async function main(): Promise<void> {
     // Sync runtime refs with persisted settings BEFORE first scan tick. The
     // runtime's single hooksEnabled ref follows the Claude provider until the
     // scanners grow per-provider awareness alongside the Settings UI.
-    runtime.hooksEnabled.current = getHooksEnabled(claudeProvider.id);
-    runtime.watchAllSessions.current = adapter.getSetting('pixel-agents.watchAllSessions', false);
+    runtime.hooksEnabled.current =
+      activeProvider.id === claudeProvider.id && getHooksEnabled(claudeProvider.id);
+    // Hook-only remote providers have no local workspace scanner to establish
+    // ownership. Selecting one is the explicit opt-in to adopt all of its events.
+    runtime.watchAllSessions.current =
+      activeProvider.id !== claudeProvider.id ||
+      adapter.getSetting('pixel-agents.watchAllSessions', false);
 
     // Install hooks on startup if the persisted setting says so — gated on the
     // one-time consent to modify ~/.claude/settings.json.
-    if (runtime.hooksEnabled.current) {
+    if (activeProvider.id === claudeProvider.id && runtime.hooksEnabled.current) {
       let consent = getHooksConsent(claudeProvider.id) === 'granted';
       if (!consent && (await claudeProvider.areHooksInstalled())) {
         // Our hooks are already installed and already firing — a pre-consent
@@ -274,7 +305,7 @@ async function main(): Promise<void> {
           console.error(`[Pixel Agents] ${err instanceof Error ? err.message : String(err)}`);
         }
       }
-    } else {
+    } else if (activeProvider.id === claudeProvider.id) {
       // Without this line, a persisted hooks-off makes startup skip the entire
       // consent/install flow with zero output — indistinguishable from a bug.
       console.log(
@@ -284,7 +315,7 @@ async function main(): Promise<void> {
 
     // Start scanning for external sessions (Claude running in user's terminal)
     const cwd = process.cwd();
-    const dirs = claudeProvider.getSessionDirs?.(cwd);
+    const dirs = activeProvider.getSessionDirs?.(cwd);
     if (dirs && dirs[0]) {
       const projectDir = dirs[0];
       console.log(`[Pixel Agents] Scanning project dir: ${projectDir}`);
@@ -302,6 +333,7 @@ async function main(): Promise<void> {
     // address; only the consent-bearing toggle needs the token.
     const displayHost =
       args.host === '0.0.0.0' || args.host === '::' || args.host === '' ? '127.0.0.1' : args.host;
+    console.log(`[Pixel Agents] Active provider: ${activeProvider.displayName}`);
     console.log(
       `\n  Pixel Agents server running at http://${displayHost}:${config.port}/?token=${config.token}\n`,
     );

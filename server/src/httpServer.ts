@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import Fastify from 'fastify';
 
+import type { HookProvider } from '../../core/src';
 import type { AgentRuntime } from './agentRuntime.js';
 import type { AgentStateStore } from './agentStateStore.js';
 import type {
@@ -29,12 +30,16 @@ export interface HttpServerOptions {
   host?: string;
   /** Port to listen on. Default: 0 (auto-assign) */
   port?: number;
-  /** Bearer auth token for hook and WebSocket endpoints */
+  /** Bearer auth token for privileged WebSocket clients. */
   token: string;
+  /** Optional dedicated Bearer token for hook ingestion. Defaults to token. */
+  hookToken?: string;
   /** AgentStateStore for WebSocket broadcast piping */
   store: AgentStateStore;
   /** Shared agent lifecycle core (for toggle side effects + standalone restore). Optional in embedded mode. */
   runtime?: AgentRuntime;
+  /** The single provider backing this runtime and its webview capabilities. */
+  activeProvider?: HookProvider;
   /** Path to SPA dist directory for static serving (standalone only) */
   staticDir?: string;
   /** Cached assets loaded at startup (standalone only) */
@@ -116,7 +121,7 @@ function registerHookRoute(app: FastifyInstance, options: HttpServerOptions): vo
   }>(
     `${HOOK_API_PREFIX}/:providerId`,
     {
-      preHandler: bearerAuth(options.token),
+      preHandler: bearerAuth(options.hookToken ?? options.token),
       schema: {
         params: {
           type: 'object',
@@ -207,6 +212,7 @@ function registerWebSocketRoute(app: FastifyInstance, options: HttpServerOptions
         handleClientMessage(msg, (m) => safeSend(socket, m), {
           store,
           runtime: options.runtime,
+          activeProvider: options.activeProvider,
           cache: options.assetCache ?? null,
           onSetHooksEnabled: options.onSetHooksEnabled,
           onReloadAssets: options.onReloadAssets,

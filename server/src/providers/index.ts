@@ -11,10 +11,11 @@
  * than reaching into each provider directory directly.
  */
 
-import type { HookProvider } from '../../../core/src/provider.js';
+import type { HookProvider } from '../../../core/src';
 import { claudeProvider } from './hook/claude/claude.js';
+import { hermesProvider } from './hook/hermes/hermes.js';
 
-export { claudeProvider };
+export { claudeProvider, hermesProvider };
 export { copyHookScript } from './hook/claude/claudeHookInstaller.js';
 
 /** Every bundled hook provider, in registration order. The consent gate loops
@@ -22,8 +23,19 @@ export { copyHookScript } from './hook/claude/claudeHookInstaller.js';
  *  one) and `hooksConsentResponse` resolves its provider id against it. */
 export const hookProviders: readonly HookProvider[] = [claudeProvider];
 
+/** Providers that can back one standalone runtime. A provider may be selectable
+ * before its consent-gated installer ships; hookProviders remains the narrower
+ * list of providers whose settings the current build can safely modify. */
+export const standaloneProviders: readonly HookProvider[] = [claudeProvider, hermesProvider];
+
 /** Resolve a wire-supplied provider id, or undefined for an unknown one —
  *  the caller writes nothing on undefined (fail-closed, like a junk choice). */
 export function hookProviderById(id: unknown): HookProvider | undefined {
   return typeof id === 'string' ? hookProviders.find((p) => p.id === id) : undefined;
+}
+
+/** Resolve a provider selected by the standalone CLI. Unlike hookProviderById,
+ * this includes hook-only observation providers whose installer is not bundled. */
+export function standaloneProviderById(id: unknown): HookProvider | undefined {
+  return typeof id === 'string' ? standaloneProviders.find((p) => p.id === id) : undefined;
 }

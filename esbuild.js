@@ -34,6 +34,19 @@ function copyAssets() {
   }
 }
 
+/** Copy the Hermes observer plugin into the distributable image/package tree. */
+function copyHermesPlugin() {
+  const srcDir = path.join(__dirname, 'hermes-plugin');
+  const dstDir = path.join(__dirname, 'dist', 'hermes-plugin');
+  if (!fs.existsSync(srcDir)) return;
+  fs.rmSync(dstDir, { recursive: true, force: true });
+  fs.mkdirSync(dstDir, { recursive: true });
+  for (const file of ['plugin.yaml', '__init__.py']) {
+    fs.copyFileSync(path.join(srcDir, file), path.join(dstDir, file));
+  }
+  console.log('✓ Copied Hermes plugin → dist/hermes-plugin/');
+}
+
 /**
  * Bundle hook scripts (TypeScript) to dist/hooks via esbuild.
  * Produces a self-contained CJS file with shebang for Claude Code to execute.
@@ -107,6 +120,7 @@ async function main() {
     await ctx.dispose();
     // Copy assets and hooks after build
     copyAssets();
+    copyHermesPlugin();
     buildHooks();
     await buildCli();
     await buildUninstall();

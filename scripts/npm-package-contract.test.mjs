@@ -42,6 +42,14 @@ test('rejects a known-bad tarball missing the shipped hook', () => {
   );
 });
 
+test('rejects a tarball missing the Hermes plugin', () => {
+  const files = validFiles().filter((file) => file.path !== 'dist/hermes-plugin/__init__.py');
+  assert.throws(
+    () => validatePackageFiles(files),
+    /missing required file: dist\/hermes-plugin\/__init__\.py/,
+  );
+});
+
 test('rejects source and preview files even when required files exist', () => {
   assert.throws(
     () => validatePackageFiles([...validFiles(), { path: 'server/src/cli.ts' }]),
