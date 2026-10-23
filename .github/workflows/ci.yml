@@ -27,6 +27,7 @@ concurrency:
 
 jobs:
   ci:
+    if: (vars.BUILD_BACKEND == '' || vars.BUILD_BACKEND == 'github')
     name: CI
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -232,6 +233,7 @@ jobs:
           exit "$failed"
 
   npm-package-node20:
+    if: (vars.BUILD_BACKEND == '' || vars.BUILD_BACKEND == 'github')
     name: npm Package Smoke (Node 20)
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -255,6 +257,7 @@ jobs:
         run: npm run test:package-contract && npm run verify:npm-package
 
   e2e:
+    if: (vars.BUILD_BACKEND == '' || vars.BUILD_BACKEND == 'github')
     name: ${{ matrix.target.label }} E2E (shard ${{ matrix.shard }}/3)
     # One matrix replaces the former linux-e2e / macos-e2e / windows-e2e jobs:
     # 3 OSes x 3 shards = 9 runs. Shard distribution is test-level (Playwright
@@ -429,7 +432,7 @@ jobs:
   # whole e2e matrix all succeed.
   required-checks:
     name: Required Checks
-    if: always()
+    if: (vars.BUILD_BACKEND == '' || vars.BUILD_BACKEND == 'github') && (always())
     needs:
       - ci
       - npm-package-node20
@@ -451,7 +454,7 @@ jobs:
 
   deploy-preview-precheck:
     name: Deploy Precheck
-    if: always() && github.event_name == 'pull_request'
+    if: (vars.BUILD_BACKEND == '' || vars.BUILD_BACKEND == 'github') && (always() && github.event_name == 'pull_request')
     needs:
       - ci
       - e2e
@@ -550,7 +553,7 @@ jobs:
   deploy-preview:
     name: Deploy Preview
     needs: deploy-preview-precheck
-    if: always() && needs.deploy-preview-precheck.outputs.ready == 'true'
+    if: (vars.BUILD_BACKEND == '' || vars.BUILD_BACKEND == 'github') && (always() && needs.deploy-preview-precheck.outputs.ready == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
