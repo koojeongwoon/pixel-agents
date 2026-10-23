@@ -1,0 +1,14 @@
+{
+  "repository": "koojeongwoon/pixel-agents",
+  "test": [
+    "bash",
+    "scripts/test-build.sh"
+  ],
+  "images": [
+    {
+      "image": "ghcr.io/koojeongwoon/pixel-agents",
+      "dockerfile": "Dockerfile",
+      "context": "."
+    }
+  ]
+}

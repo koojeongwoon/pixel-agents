@@ -17,6 +17,7 @@ env:
 
 jobs:
   publish:
+    if: (vars.BUILD_BACKEND == '' || vars.BUILD_BACKEND == 'github')
     name: Build and publish Oracle arm64 image
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
